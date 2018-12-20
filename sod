@@ -1,0 +1,67 @@
+#!/usr/bin/env python
+
+import os
+import docker as docker_
+import argparse
+
+from flask import Flask, request
+
+docker = docker_.from_env()
+
+root_parser = argparse.ArgumentParser()
+root_parser.add_argument('--host', default='0.0.0.0')
+root_parser.add_argument('--port', default=80, type=int)
+root_parser.add_argument('--debug', action='store_true')
+root_parser.add_argument('--token')
+
+args = root_parser.parse_args()
+
+
+def _validate_token():
+    if not args.token:
+        return True
+    return request.args.get('token') == args.token
+
+
+def _validate():
+    return _validate_token()
+
+
+def system(cmd):
+    os.system(cmd)
+
+
+def _deploy_docker(domain, image):
+    containers = docker.containers.list(filters={'name': domain})
+    for container in containers:
+        container.remove(force=True)
+    docker.containers.run(
+        image,
+        name=domain,
+        detach=True,
+        network='traefik',
+        labels={
+            'traefik.frontend.rule': 'Host:%s' % domain,
+            'traefik.port': '80',
+            'traefik.frontend.entryPoints': 'http,https',
+            'traefik.docker.network': 'traefik',
+            'traefik.enable': 'true',
+        }
+    )
+
+
+app = Flask(__name__)
+
+
+@app.route("/api/v1/deploy/docker/")
+def deploy_docker():
+    if not _validate():
+        return 'ERR'
+    image = request.args['image']
+    domain = request.args['domain']
+    _deploy_docker(domain, image)
+    return 'OK'
+
+
+if __name__ == "__main__":
+    app.run(args.host, args.port, args.debug)
