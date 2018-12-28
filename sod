@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os
 import docker as docker_
@@ -31,10 +31,23 @@ def system(cmd):
     os.system(cmd)
 
 
-def _deploy_docker(domain, image):
-    containers = docker.containers.list(filters={'name': domain})
+def _deploy_docker(domain, image, registry_user=None, registry_password=None):
+    containers = docker.containers.list(all=True, filters={'name': domain})
+
     for container in containers:
         container.remove(force=True)
+
+    if registry_user and registry_password:
+        docker.images.pull(
+            image,
+            auth_config={
+                'username': registry_user,
+                'password': registry_password
+            }
+        )
+    else:
+        docker.images.pull(image)
+
     docker.containers.run(
         image,
         name=domain,
@@ -59,7 +72,9 @@ def deploy_docker():
         return 'ERR'
     image = request.args['image']
     domain = request.args['domain']
-    _deploy_docker(domain, image)
+    registry_user = request.args.get('registry_user')
+    registry_password = request.args.get('registry_password')
+    _deploy_docker(domain, image, registry_user, registry_password)
     return 'OK'
 
 
