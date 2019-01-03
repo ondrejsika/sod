@@ -54,11 +54,13 @@ def _deploy_docker(domain, image, registry_user=None, registry_password=None):
         detach=True,
         network='traefik',
         labels={
-            'traefik.frontend.rule': 'Host:%s' % domain,
+            'traefik.frontend.rule': 'Host:%s,www.%s' % (domain, domain),
             'traefik.port': '80',
             'traefik.frontend.entryPoints': 'http,https',
             'traefik.docker.network': 'traefik',
             'traefik.enable': 'true',
+            'traefik.frontend.redirect.regex': '^https?://www.%s/(.*)' % domain,
+            'traefik.frontend.redirect.replacement': 'https://%s/${1}' % domain,
         }
     )
 
